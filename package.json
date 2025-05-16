@@ -7,7 +7,9 @@
     "start": "electron .",
     "watch": "nodemon --exec \"electron .\" --watch main.js --watch renderer.js --watch preload.js --watch index.html --watch style.css",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:all": "electron-builder -mw"
   },
   "keywords": [
     "electron",
@@ -38,7 +40,7 @@
       "icon": "build/icon.icns"
     },
     "win": {
-      "target": "nsis",
+      "target": "nsis", 
       "icon": "build/icon.ico"
     },
     "nsis": {
