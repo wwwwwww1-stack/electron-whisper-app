@@ -92,7 +92,4 @@ Apache 2.0
 
 欢迎提交 Issue 和 Pull Request！
 
----
-
-注意：您需要创建 `docs` 目录并添加一张应用界面的截图，命名为 `app-screenshot.png`。
-        
+---        
