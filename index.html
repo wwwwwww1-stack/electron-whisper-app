@@ -11,15 +11,20 @@
         <h1>Video to SRT Transcription</h1>
 
         <div class="form-group">
-            <label for="videoFile">Select Video File:</label>
-            <button type="button" id="selectVideoBtn">Choose Video</button>
-            <span id="videoFilePath">No file selected</span>
+            <label for="videoFiles">Select Video File(s):</label>
+            <button type="button" id="selectVideoBtn">Choose Videos</button>
+            <span id="videoFilePath">No files selected</span>
         </div>
 
         <div class="form-group">
-            <label for="outputDir">Select Output Directory for SRT:</label>
+            <label for="outputDir">Select Output Directory for SRTs:</label>
             <button type="button" id="selectOutputDirBtn">Choose Directory</button>
             <span id="outputDirPath">No directory selected</span>
+        </div>
+
+        <div class="form-group">
+            <label for="concurrency">Number of Concurrent Transcriptions:</label>
+            <input type="number" id="concurrency" value="1" min="1" max="10">
         </div>
 
         <div class="form-group">

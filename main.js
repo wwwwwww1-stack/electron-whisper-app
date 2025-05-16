@@ -1,4 +1,4 @@
-   const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -67,6 +67,23 @@ ipcMain.handle('dialog:openVideoFile', async () => {
     }
 });
 
+// 处理选择多个视频文件的请求
+ipcMain.handle('dialog:openVideoFiles', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+        title: '选择视频文件',
+        properties: ['openFile', 'multiSelections'], // 启用多选
+        filters: [
+            { name: '视频文件', extensions: ['mp4', 'mkv', 'mov', 'avi', 'webm', 'flv', 'wmv'] },
+            { name: '所有文件', extensions: ['*'] }
+        ]
+    });
+    if (canceled || filePaths.length === 0) {
+        return null;
+    } else {
+        return filePaths;
+    }
+});
+
 // 处理选择输出目录的请求
 ipcMain.handle('dialog:openDirectory', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
@@ -82,63 +99,92 @@ ipcMain.handle('dialog:openDirectory', async () => {
 
 // 处理启动 Python 脚本进行转录的请求
 ipcMain.on('start-transcription', (event, args) => {
-    const { videoPath, outputSrtPath, model, language, task } = args;
-
-    // 确定 Python 脚本的路径。
-    // 如果你打包你的应用，这里可能需要调整。
-    const scriptName = 'transcribe_video.py'; // Python 脚本的文件名
-    const scriptPath = path.join(__dirname, scriptName);
-
-    // 确定 Python 可执行文件的路径
-    // 在某些系统上可能是 'python3' 或需要指定完整路径
-    const pythonExecutable = process.platform === 'win32' ? 'python.exe' : 'python3'; // 或者只是 'python'
-
-    const scriptArgs = [
-        scriptPath, // Python 脚本本身作为第一个参数
-        videoPath,
-        '--output_srt_path', outputSrtPath,
-        '--model', model,
-        '--task', task
-    ];
-
-    if (language && language.trim() !== '') {
-        scriptArgs.push('--language', language);
+    const { videoPaths, outputDir, model, language, task, concurrency } = args;
+    
+    let completedCount = 0;
+    let activeJobs = 0;
+    const queue = [...videoPaths];
+    
+    const startNextJob = () => {
+        if (queue.length === 0 || activeJobs >= concurrency) return;
+        
+        activeJobs++;
+        const videoPath = queue.shift();
+        const videoFileName = path.basename(videoPath);
+        const srtFileName = videoFileName.substring(0, videoFileName.lastIndexOf('.')) + '.srt';
+        const outputSrtPath = path.join(outputDir, srtFileName);
+        
+        const scriptPath = path.join(__dirname, 'transcribe_video.py');
+        const pythonExecutable = process.platform === 'win32' ? 'python.exe' : 'python3';
+        
+        const scriptArgs = [
+            scriptPath,
+            videoPath,
+            '--output_srt_path', outputSrtPath,
+            '--model', model,
+            '--task', task
+        ];
+        
+        if (language && language.trim() !== '') {
+            scriptArgs.push('--language', language);
+        }
+        
+        mainWindow.webContents.send('script-output', `开始处理文件: ${videoFileName}\n`);
+        
+        const pythonProcess = spawn(pythonExecutable, scriptArgs);
+        
+        pythonProcess.stdout.on('data', (data) => {
+            mainWindow.webContents.send('script-output', data.toString());
+        });
+        
+        pythonProcess.stderr.on('data', (data) => {
+            mainWindow.webContents.send('script-output', `错误输出 (${videoFileName}): ${data.toString()}`);
+        });
+        
+        pythonProcess.on('close', (code) => {
+            activeJobs--;
+            completedCount++;
+            
+            if (code === 0) {
+                mainWindow.webContents.send('transcription-complete', {
+                    message: `文件 ${videoFileName} 转录完成`,
+                    srtPath: outputSrtPath
+                });
+            } else {
+                mainWindow.webContents.send('transcription-error', 
+                    `处理文件 ${videoFileName} 失败，退出代码: ${code}`);
+            }
+            
+            // 检查是否所有任务都完成了
+            if (completedCount === videoPaths.length) {
+                mainWindow.webContents.send('all-transcriptions-complete', {
+                    message: `所有 ${completedCount} 个文件处理完成`,
+                    summary: `成功处理了 ${completedCount} 个文件，请查看输出目录`
+                });
+            } else {
+                startNextJob(); // 启动下一个任务
+            }
+        });
+        
+        pythonProcess.on('error', (err) => {
+            activeJobs--;
+            completedCount++;
+            mainWindow.webContents.send('transcription-error', 
+                `启动处理文件 ${videoFileName} 失败: ${err.message}`);
+            
+            if (completedCount === videoPaths.length) {
+                mainWindow.webContents.send('all-transcriptions-complete', {
+                    message: `所有任务处理完成，但有错误发生`,
+                    summary: `处理了 ${completedCount} 个文件，请检查日志了解详情`
+                });
+            } else {
+                startNextJob(); // 启动下一个任务
+            }
+        });
+    };
+    
+    // 根据并发数启动初始任务
+    for (let i = 0; i < Math.min(concurrency, videoPaths.length); i++) {
+        startNextJob();
     }
-
-    mainWindow.webContents.send('script-output', `准备执行: ${pythonExecutable} "${scriptArgs.join('" "')}"\n`);
-
-    const pythonProcess = spawn(pythonExecutable, scriptArgs);
-
-    let srtFileGeneratedPath = null; // 用于存储从 Python 脚本捕获的 SRT 文件路径
-
-    pythonProcess.stdout.on('data', (data) => {
-        const output = data.toString();
-        mainWindow.webContents.send('script-output', output);
-        // 检查 Python 脚本中定义的特殊标记
-        const srtPathMarker = "SRT_OUTPUT_PATH:";
-        if (output.includes(srtPathMarker)) {
-            srtFileGeneratedPath = output.substring(output.indexOf(srtPathMarker) + srtPathMarker.length).trim();
-        }
-    });
-
-    pythonProcess.stderr.on('data', (data) => {
-        mainWindow.webContents.send('script-output', `错误输出 (stderr): ${data.toString()}`);
-    });
-
-    pythonProcess.on('close', (code) => {
-        if (code === 0) {
-            mainWindow.webContents.send('transcription-complete', {
-                message: '转录过程成功完成。',
-                srtPath: srtFileGeneratedPath // 将捕获到的 SRT 路径发送回渲染器
-            });
-        } else {
-            mainWindow.webContents.send('transcription-error', `Python 脚本执行失败，退出代码: ${code}`);
-        }
-        mainWindow.webContents.send('script-output', `\nPython 脚本已退出，代码: ${code}\n`);
-    });
-
-    pythonProcess.on('error', (err) => {
-        mainWindow.webContents.send('transcription-error', `启动 Python 脚本失败: ${err.message}`);
-        mainWindow.webContents.send('script-output', `启动 Python 脚本错误: ${err.message}\n`);
-    });
 });

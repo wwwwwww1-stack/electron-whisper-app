@@ -8,18 +8,23 @@ const taskSelect = document.getElementById('taskSelect');
 const startBtn = document.getElementById('startBtn');
 const outputLog = document.getElementById('outputLog');
 const srtOutputPathDisplay = document.getElementById('srtOutputPathDisplay');
+const concurrencyInput = document.getElementById('concurrency'); // New element
 
-let currentVideoPath = '';
+let currentVideoPaths = []; // Changed from string to array
 let currentOutputDirPath = '';
 
 selectVideoBtn.addEventListener('click', async () => {
-    const filePath = await window.electronAPI.selectVideoFile();
-    if (filePath) {
-        videoFilePathSpan.textContent = filePath;
-        currentVideoPath = filePath;
+    // Modify to handle multiple file selection if the API supports it
+    // For now, assuming 'selectVideoFile' is updated in preload.js and main.js
+    // to return an array of paths or we call it multiple times/have a new API method.
+    // Let's assume 'selectVideoFiles' (plural) will be the new method in preload.js
+    const filePaths = await window.electronAPI.selectVideoFiles(); // Assuming a new or modified API
+    if (filePaths && filePaths.length > 0) {
+        videoFilePathSpan.textContent = filePaths.join(', ');
+        currentVideoPaths = filePaths;
     } else {
-        videoFilePathSpan.textContent = 'No file selected';
-        currentVideoPath = '';
+        videoFilePathSpan.textContent = 'No files selected';
+        currentVideoPaths = [];
     }
 });
 
@@ -35,8 +40,8 @@ selectOutputDirBtn.addEventListener('click', async () => {
 });
 
 startBtn.addEventListener('click', () => {
-    if (!currentVideoPath) {
-        alert('Please select a video file.');
+    if (currentVideoPaths.length === 0) {
+        alert('Please select at least one video file.');
         return;
     }
     if (!currentOutputDirPath) {
@@ -44,31 +49,29 @@ startBtn.addEventListener('click', () => {
         return;
     }
 
+    const concurrency = parseInt(concurrencyInput.value, 10);
+    if (isNaN(concurrency) || concurrency < 1) {
+        alert('Please enter a valid number for concurrent transcriptions.');
+        return;
+    }
+
     // Clear previous log and srt path
     outputLog.textContent = '';
-    srtOutputPathDisplay.textContent = '';
+    srtOutputPathDisplay.textContent = ''; // This might need to be cleared or updated differently for batch
     startBtn.disabled = true;
-    outputLog.textContent += 'Starting transcription process...\n';
+    outputLog.textContent += `Starting transcription process for ${currentVideoPaths.length} file(s)...
+`;
+    outputLog.textContent += `Concurrency set to: ${concurrency}\n`;
 
-    const videoFileName = currentVideoPath.split(/[\\/]/).pop(); // Get filename
-    const srtFileName = videoFileName.substring(0, videoFileName.lastIndexOf('.')) + '.srt'; // video.mp4 -> video.srt
-
-    // Construct full output SRT path. Ensure it's platform-independent if sending to Python
-    // For simplicity here, we assume Python script handles path joining if outputDirPath is just a dir.
-    // The Python script expects a full path, so let's construct it.
-    // Note: Node's path.join would be ideal if main.js constructed this,
-    // but here renderer needs to pass it, so string concat is shown.
-    // Python's Path(output_dir) / srt_filename is more robust.
-    // The python script expects a full path `output_srt_path_str`
-    const outputSrtPath = `${currentOutputDirPath}${currentOutputDirPath.includes('/') ? '/' : '\\'}${srtFileName}`;
-
-
+    // For batch processing, we'll send all paths and concurrency to main.js
+    // main.js will handle creating individual SRT names and managing the queue.
     const args = {
-        videoPath: currentVideoPath,
-        outputSrtPath: outputSrtPath, // Send the constructed full path
+        videoPaths: currentVideoPaths, // Array of video paths
+        outputDir: currentOutputDirPath, // Single output directory
         model: modelSelect.value,
-        language: languageSelect.value || null, // Send null if empty for auto-detect
-        task: taskSelect.value
+        language: languageSelect.value || null,
+        task: taskSelect.value,
+        concurrency: concurrency
     };
 
     window.electronAPI.startTranscription(args);
@@ -80,15 +83,30 @@ window.electronAPI.onScriptOutput((data) => {
 });
 
 window.electronAPI.onTranscriptionComplete((data) => {
+    // This will likely need to be updated to handle multiple completions
+    // or a single message when all are done.
     outputLog.textContent += `\n${data.message}\n`;
-    if (data.srtPath) {
-        srtOutputPathDisplay.textContent = `SRT file saved: ${data.srtPath}`;
+    if (data.srtPath) { // For individual file completion if main.js sends it
+        srtOutputPathDisplay.textContent += `SRT file saved: ${data.srtPath}\n`;
         outputLog.textContent += `SRT Output Path: ${data.srtPath}\n`;
+    } else if (data.allComplete) { // A new flag to indicate all files are processed
+        srtOutputPathDisplay.textContent = `All ${data.count} files processed. Check output directory.`;
     }
-    startBtn.disabled = false;
+    // Potentially re-enable startBtn only when all tasks in the batch are done.
+    // This logic will be managed by main.js sending appropriate signals.
+    // For now, let's assume main.js sends a specific signal or updates a counter.
+    // startBtn.disabled = false; // This will be handled by a new 'all-transcriptions-complete' event
 });
 
 window.electronAPI.onTranscriptionError((errorMsg) => {
     outputLog.textContent += `\nERROR: ${errorMsg}\n`;
+    // Decide if startBtn should be re-enabled on error for one file in a batch
+    // startBtn.disabled = false; // Potentially re-enable or handle based on batch status
+});
+
+// New event listener for when all batch transcriptions are complete
+window.electronAPI.onAllTranscriptionsComplete((data) => {
+    outputLog.textContent += `\n${data.message}\n`;
+    srtOutputPathDisplay.textContent = data.summary || 'All transcriptions finished.';
     startBtn.disabled = false;
 });
