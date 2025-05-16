@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+    <title>Whisper Video Transcriber</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Video to SRT Transcription</h1>
+
+        <div class="form-group">
+            <label for="videoFile">Select Video File:</label>
+            <button type="button" id="selectVideoBtn">Choose Video</button>
+            <span id="videoFilePath">No file selected</span>
+        </div>
+
+        <div class="form-group">
+            <label for="outputDir">Select Output Directory for SRT:</label>
+            <button type="button" id="selectOutputDirBtn">Choose Directory</button>
+            <span id="outputDirPath">No directory selected</span>
+        </div>
+
+        <div class="form-group">
+            <label for="modelSelect">Whisper Model:</label>
+            <select id="modelSelect">
+                <option value="tiny">tiny</option>
+                <option value="base" selected>base</option>
+                <option value="small">small</option>
+                <option value="medium">medium</option>
+                <option value="large">large</option>
+                <option value="large-v2">large-v2</option>
+                <option value="large-v3">large-v3</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="languageSelect">Language:</label>
+            <select id="languageSelect">
+                <option value="">Auto-detect</option>
+                <option value="en">English</option>
+                <option value="ja">Japanese (日本語)</option>
+                <option value="zh">Chinese (中文)</option>
+                </select>
+        </div>
+
+        <div class="form-group">
+            <label for="taskSelect">Task:</label>
+            <select id="taskSelect">
+                <option value="transcribe" selected>transcribe</option>
+                <option value="translate">translate</option>
+            </select>
+        </div>
+
+        <button type="button" id="startBtn">Start Transcription</button>
+
+        <h2>Log Output:</h2>
+        <div id="outputLogContainer">
+            <pre id="outputLog"></pre>
+        </div>
+        <p id="srtOutputPathDisplay"></p>
+
+    </div>
+    <script src="./renderer.js"></script>
+</body>
+</html>

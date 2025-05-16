@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Python virtual environment
+.venv/
+
+# Build output
+dist/
+
+# macOS specific
+.DS_Store
+
+# IDE specific
+.idea/
+*.iml

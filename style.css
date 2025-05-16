@@ -1,0 +1,87 @@
+ body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+.container {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    text-align: center;
+    color: #333;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-group input[type="text"],
+.form-group select {
+    width: calc(100% - 22px);
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+#videoFilePath, #outputDirPath {
+    margin-left: 10px;
+    font-style: italic;
+    color: #555;
+}
+
+#outputLogContainer {
+    margin-top: 20px;
+    border: 1px solid #ddd;
+    padding: 10px;
+    background-color: #f9f9f9;
+    max-height: 300px;
+    overflow-y: auto;
+    border-radius: 4px;
+}
+
+#outputLog {
+    white-space: pre-wrap; /* Allows line breaks */
+    word-wrap: break-word; /* Breaks long words */
+    font-family: monospace;
+    font-size: 0.9em;
+    margin: 0;
+}
+
+#srtOutputPathDisplay {
+    margin-top: 10px;
+    font-weight: bold;
+    color: green;
+}
